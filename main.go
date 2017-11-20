@@ -11,8 +11,7 @@ Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
-limitations under the License.
-*/
+limitations under the License.  */
 
 package main
 
@@ -20,13 +19,16 @@ import (
 	"flag"
 	"fmt"
 
+	apiv1 "k8s.io/api/core/v1"
 	kubeclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
 
 	// Uncomment the following line to load the gcp plugin (only required to authenticate against GKE clusters).
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 
+	messagev1 "github.com/yasker/example-crd/apis/message/v1"
 	"github.com/yasker/example-crd/client"
 )
 
@@ -57,4 +59,69 @@ func main() {
 	} else {
 		fmt.Printf("CRD %v registered\n", crd.ObjectMeta.Name)
 	}
+
+	client, _, err := client.NewClient(config)
+	if err != nil {
+		panic(err)
+	}
+
+	var result messagev1.Message
+	// Create an instance of our custom resource
+	firstMessage := &messagev1.Message{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "firstmessage",
+		},
+		Spec: messagev1.MessageSpec{
+			Context: "First message",
+			Urgent:  false,
+		},
+		Status: messagev1.MessageStatus{
+			State: messagev1.MessageStateCreated,
+		},
+	}
+	err = client.Post().
+		Resource(messagev1.MessageResourcePlural).
+		Namespace(apiv1.NamespaceDefault).
+		Body(firstMessage).
+		Do().Into(&result)
+	if err == nil {
+		fmt.Printf("CREATED: %#v\n", result)
+	} else if apierrors.IsAlreadyExists(err) {
+		fmt.Printf("ALREADY EXISTS: %#v\n", result)
+	} else {
+		panic(err)
+	}
+
+	secondMessage := &messagev1.Message{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "secondmessage",
+		},
+		Spec: messagev1.MessageSpec{
+			Context: "Second message",
+			Urgent:  true,
+		},
+		Status: messagev1.MessageStatus{
+			State: messagev1.MessageStateCreated,
+		},
+	}
+	err = client.Post().
+		Resource(messagev1.MessageResourcePlural).
+		Namespace(apiv1.NamespaceDefault).
+		Body(secondMessage).
+		Do().Into(&result)
+	if err == nil {
+		fmt.Printf("CREATED: %#v\n", result)
+	} else if apierrors.IsAlreadyExists(err) {
+		fmt.Printf("ALREADY EXISTS: %#v\n", result)
+	} else {
+		panic(err)
+	}
+
+	// Fetch a list of our CRs
+	messageList := messagev1.MessageList{}
+	err = client.Get().Resource(messagev1.MessageResourcePlural).Do().Into(&messageList)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("LIST: %#v\n", messageList)
 }
