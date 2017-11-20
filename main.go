@@ -30,6 +30,7 @@ import (
 
 	messagev1 "github.com/yasker/example-crd/apis/message/v1"
 	"github.com/yasker/example-crd/client"
+	messageClientset "github.com/yasker/example-crd/pkg/client/clientset/versioned"
 )
 
 func main() {
@@ -60,12 +61,12 @@ func main() {
 		fmt.Printf("CRD %v registered\n", crd.ObjectMeta.Name)
 	}
 
-	client, _, err := client.NewClient(config)
+	crClient, err := messageClientset.NewForConfig(config)
 	if err != nil {
 		panic(err)
 	}
 
-	var result messagev1.Message
+	var result *messagev1.Message
 	// Create an instance of our custom resource
 	firstMessage := &messagev1.Message{
 		ObjectMeta: metav1.ObjectMeta{
@@ -79,11 +80,7 @@ func main() {
 			State: messagev1.MessageStateCreated,
 		},
 	}
-	err = client.Post().
-		Resource(messagev1.MessageResourcePlural).
-		Namespace(apiv1.NamespaceDefault).
-		Body(firstMessage).
-		Do().Into(&result)
+	result, err = crClient.MessageV1().Messages(apiv1.NamespaceDefault).Create(firstMessage)
 	if err == nil {
 		fmt.Printf("CREATED: %#v\n", result)
 	} else if apierrors.IsAlreadyExists(err) {
@@ -104,11 +101,7 @@ func main() {
 			State: messagev1.MessageStateCreated,
 		},
 	}
-	err = client.Post().
-		Resource(messagev1.MessageResourcePlural).
-		Namespace(apiv1.NamespaceDefault).
-		Body(secondMessage).
-		Do().Into(&result)
+	result, err = crClient.MessageV1().Messages(apiv1.NamespaceDefault).Create(secondMessage)
 	if err == nil {
 		fmt.Printf("CREATED: %#v\n", result)
 	} else if apierrors.IsAlreadyExists(err) {
@@ -118,6 +111,11 @@ func main() {
 	}
 
 	// Fetch a list of our CRs
+	client, _, err := client.NewClient(config)
+	if err != nil {
+		panic(err)
+	}
+
 	messageList := messagev1.MessageList{}
 	err = client.Get().Resource(messagev1.MessageResourcePlural).Do().Into(&messageList)
 	if err != nil {

@@ -22,6 +22,8 @@ import (
 
 const MessageResourcePlural = "messages"
 
+// +genclient
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type Message struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -47,6 +49,7 @@ const (
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 type MessageList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
