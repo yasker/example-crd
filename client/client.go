@@ -17,8 +17,12 @@ limitations under the License.
 package client
 
 import (
+	"time"
+
+	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 
 	messagev1 "github.com/yasker/example-crd/apis/message/v1"
@@ -42,4 +46,21 @@ func NewClient(cfg *rest.Config) (*rest.RESTClient, *runtime.Scheme, error) {
 	}
 
 	return client, scheme, nil
+}
+
+func WaitForMessageInstanceProcessed(client *rest.RESTClient, name string) error {
+	return wait.Poll(100*time.Millisecond, 10*time.Second, func() (bool, error) {
+		var message messagev1.Message
+		err := client.Get().
+			Resource(messagev1.MessageResourcePlural).
+			Namespace(apiv1.NamespaceDefault).
+			Name(name).
+			Do().Into(&message)
+
+		if err == nil && message.Status.State == messagev1.MessageStateBroadcasted {
+			return true, nil
+		}
+
+		return false, err
+	})
 }

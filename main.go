@@ -16,6 +16,7 @@ limitations under the License.  */
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 
@@ -31,6 +32,8 @@ import (
 	messagev1 "github.com/yasker/example-crd/apis/message/v1"
 	"github.com/yasker/example-crd/client"
 	messageClientset "github.com/yasker/example-crd/pkg/client/clientset/versioned"
+
+	controller "github.com/yasker/example-crd/controller"
 )
 
 func main() {
@@ -60,6 +63,21 @@ func main() {
 	} else {
 		fmt.Printf("CRD %v registered\n", crd.ObjectMeta.Name)
 	}
+
+	messageClient, messageScheme, err := client.NewClient(config)
+	if err != nil {
+		panic(err)
+	}
+
+	// start a controller on instances of our custom resource
+	controller := controller.MessageController{
+		MessageClient: messageClient,
+		MessageScheme: messageScheme,
+	}
+
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
+	go controller.Run(ctx)
 
 	crClient, err := messageClientset.NewForConfig(config)
 	if err != nil {
@@ -110,14 +128,23 @@ func main() {
 		panic(err)
 	}
 
-	// Fetch a list of our CRs
-	client, _, err := client.NewClient(config)
+	// Poll until Message object is handled by controller and gets status
+	// updated to "Broadcasted"
+	err = client.WaitForMessageInstanceProcessed(messageClient, "firstmessage")
 	if err != nil {
 		panic(err)
 	}
+	fmt.Print("BROADCASTED first message!\n")
 
+	err = client.WaitForMessageInstanceProcessed(messageClient, "secondmessage")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Print("BROADCASTED second message!\n")
+
+	// Fetch a list of our CRs
 	messageList := messagev1.MessageList{}
-	err = client.Get().Resource(messagev1.MessageResourcePlural).Do().Into(&messageList)
+	err = messageClient.Get().Resource(messagev1.MessageResourcePlural).Do().Into(&messageList)
 	if err != nil {
 		panic(err)
 	}
